@@ -1,68 +1,53 @@
-import React, { useState } from "react";
-import UserForm from "./UserForm";
-import { FaEdit, FaTrash, FaTh, FaList, FaSearch } from "react-icons/fa";
-import "../index.css"; 
+import React, { useState, useEffect } from "react";
+import { getUsers, createUser, updateUser, deleteUser } from "../utils/api";
+import { FaTh, FaList, FaSearch } from "react-icons/fa";
+import UserTable from "./UserTable";
+import UserCard from "./UserCard";
 import UserModal from "../components/UserModal";
+import "../index.css";
 
-
-const UserList = ({ users }) => {
-  const [viewMode, setViewMode] = useState("table"); 
-  const [hoveredUser, setHoveredUser] = useState(null);
-  const [isFormVisible, setFormVisible] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
+const UserList = () => {
+  const [users, setUsers] = useState([]);
+  const [viewMode, setViewMode] = useState("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [showModal, setShowModal] = useState(false);
- // Filter users based on search input
- const filteredUsers = users.filter((user) =>
-  `${user.first_name} ${user.last_name} ${user.email}`
-    .toLowerCase()
-    .includes(searchQuery.toLowerCase())
-);
+  const [selectedUser, setSelectedUser] = useState(null);
 
+  // Fetch users on mount
+  useEffect(() => {
+    getUsers().then((response) => setUsers(response.data.data));
+  }, []);
 
-  const handleCreate = () => {
+  const handleSaveUser = async (userData) => {
+    if (selectedUser) {
+      // Edit user
+      const response = await updateUser(selectedUser.id, userData);
+      setUsers(users.map((u) => (u.id === selectedUser.id ? response.data : u)));
+    } else {
+      // Create user
+      const response = await createUser(userData);
+      setUsers([...users, response.data]);
+    }
+    setShowModal(false);
     setSelectedUser(null);
-    setFormVisible(true);
   };
 
-  const handleEdit = (user) => {
-    setSelectedUser(user);
-    setFormVisible(true);
+  const handleDelete = async (id) => {
+    await deleteUser(id);
+    setUsers(users.filter((user) => user.id !== id));
   };
 
-  const handleSubmit = (formData) => {
-    console.log("Form Data:", formData);
-    setFormVisible(false);
-  };
-
-  const handleCancel = () => {
-    setFormVisible(false);
-  };
+  const filteredUsers = users.filter((user) =>
+    `${user.first_name} ${user.last_name} ${user.email}`
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
 
   return (
-    // <div>
-    //   <button onClick={handleCreate}>Create User</button>
-    //   {isFormVisible && (
-    //     <UserForm
-    //       user={selectedUser}
-    //       onSubmit={handleSubmit}
-    //       onCancel={handleCancel}
-    //     />
-    //   )}
-    //   {users.map((user) => (
-    //     <div key={user.id}>
-    //       <h2>{user.first_name} {user.last_name}</h2>
-    //       <p>{user.email}</p>
-    //       <button onClick={() => handleEdit(user)}>Edit</button>
-    //     </div>
-    //   ))}
-    // </div>
     <div className="container mt-4">
-      {/* Header Section with Search and Create User Button */}
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h2>Users</h2>
         <div className="d-flex">
-          {/* Search Input */}
           <div className="input-group me-3">
             <input
               type="text"
@@ -75,109 +60,34 @@ const UserList = ({ users }) => {
               <FaSearch />
             </span>
           </div>
-          {/* Create User Button */}
           <button className="btn btn-primary" onClick={() => setShowModal(true)}>Create User</button>
         </div>
       </div>
 
-      {/* Toggle Buttons for View Mode */}
       <div className="d-flex mb-3">
-        <button
-          className={`btn me-2 ${viewMode === "table" ? "btn-primary" : "btn-outline-primary"}`}
-          onClick={() => setViewMode("table")}
-        >
+        <button className={`btn me-2 ${viewMode === "table" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setViewMode("table")}>
           <FaList /> Table
         </button>
-        <button
-          className={`btn ${viewMode === "grid" ? "btn-primary" : "btn-outline-primary"}`}
-          onClick={() => setViewMode("grid")}
-        >
+        <button className={`btn ${viewMode === "grid" ? "btn-primary" : "btn-outline-primary"}`} onClick={() => setViewMode("grid")}>
           <FaTh /> Card
         </button>
       </div>
 
-      {/* Table View */}
-      {viewMode === "table" && (
-        <div className="table-responsive">
-          <table className="table table-striped">
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>First Name</th>
-                <th>Last Name</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((user) => (
-                <tr key={user.id}>
-                  <td>
-                    <img
-                      src={user.avatar}
-                      alt={user.first_name}
-                      className="rounded-circle me-2"
-                      style={{ width: "40px", height: "40px", objectFit: "cover" }}
-                    />
-                    <a href={`mailto:${user.email}`} className="text-decoration-none">
-                      {user.email}
-                    </a>
-                  </td>
-                  <td>{user.first_name}</td>
-                  <td>{user.last_name}</td>
-                  <td>
-                    <button className="btn btn-primary btn-sm me-2">
-                      <FaEdit /> Edit
-                    </button>
-                    <button className="btn btn-danger btn-sm">
-                      <FaTrash /> Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {viewMode === "table" ? (
+        <UserTable users={filteredUsers} onEdit={setSelectedUser} onDelete={handleDelete} setShowModal={setShowModal} />
+      ) : (
+        <UserCard users={filteredUsers} onEdit={setSelectedUser} onDelete={handleDelete} setShowModal={setShowModal} />
       )}
-{showModal && <UserModal show={showModal} handleClose={() => setShowModal(false)} />}
-      {/* Grid View */}
-      {viewMode === "grid" && (
-        <div className="row g-4">
-          {filteredUsers.map((user) => (
-            <div key={user.id} className="col-md-4">
-              <div
-                className="card shadow-sm position-relative user-card"
-                onMouseEnter={() => setHoveredUser(user.id)}
-                onMouseLeave={() => setHoveredUser(null)}
-              >
-                <div className="card-body text-center">
-                  <img
-                    src={user.avatar}
-                    alt={user.first_name}
-                    className="rounded-circle mb-3"
-                    style={{ width: "80px", height: "80px", objectFit: "cover" }}
-                  />
-                  <h5 className="card-title">{user.first_name} {user.last_name}</h5>
-                  <p className="text-muted">{user.email}</p>
-                </div>
 
-                {/* Hover Effect for Edit & Delete */}
-                {hoveredUser === user.id && (
-                  <div className="overlay d-flex justify-content-center align-items-center">
-                    <button className="btn btn-primary me-2">
-                      <FaEdit />
-                    </button>
-                    <button className="btn btn-danger">
-                      <FaTrash />
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+      {showModal && (
+        <UserModal
+          show={showModal}
+          handleClose={() => setShowModal(false)}
+          onSave={handleSaveUser}
+          selectedUser={selectedUser}
+        />
       )}
     </div>
-    
   );
 };
 
